@@ -1,11 +1,8 @@
 name: 每日股票分析
 
 on:
-  # 定时触发 - 每天北京时间 18:00 (对应 UTC 10:00)
   schedule:
     - cron: '0 10 * * 1-5'
-  
-  # 手动触发
   workflow_dispatch:
     inputs:
       mode:
@@ -14,11 +11,10 @@ on:
         default: 'full'
         type: choice
         options:
-          - full          # 完整分析（股票+大盘）
-          - market-only   # 仅大盘复盘
-          - stocks-only   # 仅股票分析
+          - full
+          - market-only
+          - stocks-only
 
-# 并发控制：确保同一时间只有一个任务在跑
 concurrency:
   group: stock-analysis
   cancel-in-progress: false
@@ -27,49 +23,31 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 设置 Python 环境
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-      
+
       - name: 安装依赖
         run: |
           pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      
-      - name: 创建必要目录
-        run: mkdir -p data logs reports
-      
-      - name: 执行股票分析
+
+      - name: 执行分析
         env:
-          # AI 配置
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: 'gemini-1.5-flash'
-          
-          # 搜索引擎
-          TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}
-          
-          # 通知渠道
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          
-          # 自选股与数据
           STOCK_LIST: ${{ vars.STOCK_LIST || secrets.STOCK_LIST || 'sh600519' }}
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-          
-          # 运行参数
-          REPORT_TYPE: 'simple'
-          SINGLE_STOCK_NOTIFY: 'false'
+          TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}
+          PUSH_TYPES: 'telegram'
         run: |
           MODE="${{ github.event.inputs.mode || 'full' }}"
-          echo "🚀 启动模式: $MODE | 分析列表: $STOCK_LIST"
-          
           if [ "$MODE" = "market-only" ]; then
             python main.py --market-review
           elif [ "$MODE" = "stocks-only" ]; then
@@ -77,13 +55,3 @@ jobs:
           else
             python main.py
           fi
-      
-      - name: 上传分析报告
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: analysis-reports-${{ github.run_number }}
-          path: |
-            reports/
-            logs/
-          retention-days: 7
