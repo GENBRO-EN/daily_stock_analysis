@@ -18,7 +18,7 @@ on:
           - market-only   # 仅大盘复盘
           - stocks-only   # 仅股票分析
 
-# 并发控制：同一时间只运行一个分析任务
+# 并发控制：确保同一时间只有一个任务在跑
 concurrency:
   group: stock-analysis
   cancel-in-progress: false
@@ -50,31 +50,25 @@ jobs:
         env:
           # AI 配置
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || secrets.GEMINI_MODEL || 'gemini-1.5-flash' }}
-          GEMINI_MODEL_FALLBACK: ${{ vars.GEMINI_MODEL_FALLBACK || secrets.GEMINI_MODEL_FALLBACK || 'gemini-1.5-pro' }}
-          GEMINI_REQUEST_DELAY: '3.0'
+          GEMINI_MODEL: 'gemini-1.5-flash'
           
-          # 搜索服务
+          # 搜索引擎
           TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}
-          BOCHA_API_KEYS: ${{ secrets.BOCHA_API_KEYS }}
           
           # 通知渠道
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
           
-          # 数据源与自选股
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          # 自选股与数据
           STOCK_LIST: ${{ vars.STOCK_LIST || secrets.STOCK_LIST || 'sh600519' }}
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           
           # 运行参数
-          REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'simple' }}
-          SINGLE_STOCK_NOTIFY: ${{ vars.SINGLE_STOCK_NOTIFY || secrets.SINGLE_STOCK_NOTIFY || 'false' }}
-          MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}
-          LOG_LEVEL: INFO
+          REPORT_TYPE: 'simple'
+          SINGLE_STOCK_NOTIFY: 'false'
         run: |
           MODE="${{ github.event.inputs.mode || 'full' }}"
-          echo "🚀 启动分析系统 | 模式: $MODE | 股票: $STOCK_LIST"
+          echo "🚀 启动模式: $MODE | 分析列表: $STOCK_LIST"
           
           if [ "$MODE" = "market-only" ]; then
             python main.py --market-review
@@ -93,14 +87,3 @@ jobs:
             reports/
             logs/
           retention-days: 7
-
-      - name: 显示运行结果
-        if: always()
-        run: |
-          echo "=========================================="
-          if [ -d "reports" ] && [ "$(ls -A reports 2>/dev/null)" ]; then
-            echo "✅ 分析报告已生成"
-            ls -la reports/
-          else
-            echo "⚠️ 未发现报告文件，请检查日志"
-          fi
